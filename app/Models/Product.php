@@ -11,6 +11,21 @@ class Product extends Model
     use HasFactory;
 
     /**
+     * Validation rules for the product.
+     *
+     * @return array
+     */
+    public static function rules(): array
+    {
+        return [
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'price' => 'required|numeric|min:0.01',
+            'stock_quantity' => 'required|integer|min:0',
+        ];
+    }
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var array<int, string>
@@ -28,7 +43,7 @@ class Product extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'price' => 'decimal:2',
+        'price' => 'float',
         'stock_quantity' => 'integer',
     ];
 

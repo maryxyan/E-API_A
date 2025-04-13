@@ -17,9 +17,11 @@ class AdminController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'min_price' => 'nullable|numeric|min:0',
-            'max_price' => 'nullable|numeric|min:0',
-            'in_stock' => 'nullable|boolean',
+            'max_price' => 'nullable|numeric|min:0|gt:min_price',
+            'in_stock' => 'nullable|string|in:true,false,1,0',
             'search' => 'nullable|string|max:255',
+        ], [
+            'max_price.gt' => 'The max price must be greater than min price'
         ]);
 
         if ($validator->fails()) {
@@ -29,16 +31,21 @@ class AdminController extends Controller
         $query = Product::query();
 
         // Apply price range filter
-        if ($request->has('min_price')) {
+        if ($request->has(['min_price', 'max_price'])) {
+            $query->whereBetween('price', [
+                $request->min_price,
+                $request->max_price
+            ]);
+        } elseif ($request->has('min_price')) {
             $query->where('price', '>=', $request->min_price);
-        }
-        if ($request->has('max_price')) {
+        } elseif ($request->has('max_price')) {
             $query->where('price', '<=', $request->max_price);
         }
 
         // Apply stock availability filter
         if ($request->has('in_stock')) {
-            if ($request->in_stock) {
+            $inStock = filter_var($request->in_stock, FILTER_VALIDATE_BOOLEAN);
+            if ($inStock) {
                 $query->where('stock_quantity', '>', 0);
             } else {
                 $query->where('stock_quantity', '=', 0);
@@ -54,7 +61,10 @@ class AdminController extends Controller
             });
         }
 
-        $products = $query->get();
+        $products = $query->get()->map(function($product) {
+            $product->price = (float)$product->price;
+            return $product;
+        });
         return response()->json($products);
     }
 
@@ -63,15 +73,18 @@ class AdminController extends Controller
      */
     public function createProduct(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'description' => 'required|string',
-            'price' => 'required|numeric|min:0',
-            'stock_quantity' => 'required|integer|min:0',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
+        try {
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'description' => 'required|string',
+                'price' => 'required|numeric|min:0.01',
+                'stock_quantity' => 'required|integer|min:0',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
         }
 
         $product = Product::create($request->all());

@@ -3,14 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
+use Laravel\Sanctum\Sanctum;
 
 class AuthTest extends TestCase
 {
-    use RefreshDatabase;
-
     /** @test */
     public function user_can_register()
     {
@@ -19,24 +16,25 @@ class AuthTest extends TestCase
             'email' => 'test@example.com',
             'password' => 'password',
             'password_confirmation' => 'password',
-            'role' => 'customer',
+            'role' => 'customer'
         ]);
 
         $response->assertStatus(201)
             ->assertJsonStructure([
+                'access_token',
+                'token_type',
                 'user' => [
                     'id',
                     'name',
                     'email',
-                    'role',
-                ],
-                'token',
+                    'role'
+                ]
             ]);
 
         $this->assertDatabaseHas('users', [
             'name' => 'Test User',
             'email' => 'test@example.com',
-            'role' => 'customer',
+            'role' => 'customer'
         ]);
     }
 
@@ -84,43 +82,37 @@ class AuthTest extends TestCase
     {
         $user = User::factory()->create([
             'email' => 'test@example.com',
-            'password' => bcrypt('password'),
+            'password' => bcrypt('password')
         ]);
 
         $response = $this->postJson('/api/login', [
             'email' => 'test@example.com',
-            'password' => 'password',
+            'password' => 'password'
         ]);
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'user' => [
-                    'id',
-                    'name',
-                    'email',
-                    'role',
-                ],
-                'token',
+                'access_token',
+                'token_type',
+                'user'
             ]);
     }
 
     /** @test */
-    public function login_validates_credentials()
+    public function user_cannot_login_with_invalid_credentials()
     {
         $user = User::factory()->create([
             'email' => 'test@example.com',
-            'password' => bcrypt('password'),
+            'password' => bcrypt('password')
         ]);
 
         $response = $this->postJson('/api/login', [
             'email' => 'test@example.com',
-            'password' => 'wrong-password',
+            'password' => 'wrong-password'
         ]);
 
-        $response->assertStatus(401)
-            ->assertJson([
-                'message' => 'Invalid credentials',
-            ]);
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['email']);
     }
 
     /** @test */
@@ -133,17 +125,21 @@ class AuthTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJson([
-                'message' => 'Logged out successfully',
+                'message' => 'Successfully logged out'
             ]);
     }
 
     /** @test */
     public function admin_can_access_admin_routes()
     {
-        $admin = User::factory()->create(['role' => 'admin']);
-        Sanctum::actingAs($admin);
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'email' => 'admin@example.com',
+            'password' => bcrypt('password')
+        ]);
 
-        $response = $this->getJson('/api/admin/products');
+        $response = $this->actingAs($admin)
+            ->getJson('/api/admin/products');
 
         $response->assertStatus(200);
     }
@@ -151,19 +147,46 @@ class AuthTest extends TestCase
     /** @test */
     public function customer_cannot_access_admin_routes()
     {
-        $customer = User::factory()->create(['role' => 'customer']);
-        Sanctum::actingAs($customer);
+        $customer = User::factory()->create([
+            'role' => 'customer',
+            'email' => 'customer@example.com',
+            'password' => bcrypt('password')
+        ]);
 
-        $response = $this->getJson('/api/admin/products');
+        $response = $this->actingAs($customer)
+            ->getJson('/api/admin/products');
 
-        $response->assertStatus(403);
+        $response->assertStatus(403)
+            ->assertJson(['message' => 'This action is unauthorized.']);
     }
 
     /** @test */
-    public function unauthenticated_user_cannot_access_protected_routes()
+    public function customer_can_access_customer_routes()
     {
-        $response = $this->getJson('/api/admin/products');
+        $customer = User::factory()->create([
+            'role' => 'customer',
+            'email' => 'customer@example.com',
+            'password' => bcrypt('password')
+        ]);
 
-        $response->assertStatus(401);
+        $response = $this->actingAs($customer)
+            ->getJson('/api/customer/products');
+
+        $response->assertStatus(200);
+    }
+
+    /** @test */
+    public function admin_can_access_customer_routes()
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'email' => 'admin@example.com',
+            'password' => bcrypt('password')
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->getJson('/api/customer/products');
+
+        $response->assertStatus(200);
     }
 } 

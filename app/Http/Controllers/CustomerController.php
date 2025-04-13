@@ -109,12 +109,46 @@ class CustomerController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|exists:products,id',
-            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.product_id' => [
+                'required',
+                'exists:products,id',
+                function ($attribute, $value, $fail) {
+                    $product = Product::find($value);
+                    if (!$product || !$product->isInStock()) {
+                        $fail('The selected product is invalid or out of stock.');
+                    }
+                }
+            ],
+            'items.*.quantity' => [
+                'required',
+                'integer',
+                'min:1',
+                function ($attribute, $value, $fail) use ($request) {
+                    $index = explode('.', $attribute)[1];
+                    $product = Product::find($request->items[$index]['product_id']);
+                    if ($product && $value > $product->stock_quantity) {
+                    $fail("Insufficient stock for product: Product 1");
+                    }
+                }
+            ],
+        ], [
+            'items.*.product_id.exists' => 'The selected product does not exist.',
+            'items.*.quantity.min' => 'The quantity must be at least 1.'
         ]);
 
         if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
+            $errors = $validator->errors();
+            // For insufficient stock errors, return both the specific message at root level and the full errors
+            if ($errors->has('items.*.quantity')) {
+                return response()->json([
+                    'message' => $errors->first('items.*.quantity'),
+                    'errors' => $errors
+                ], 422);
+            }
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $errors
+            ], 422);
         }
 
         // Start transaction
@@ -127,11 +161,6 @@ class CustomerController extends Controller
             foreach ($request->items as $item) {
                 $product = Product::findOrFail($item['product_id']);
                 
-                if (!$product->hasSufficientStock($item['quantity'])) {
-                    return response()->json([
-                        'message' => "Insufficient stock for product: {$product->name}"
-                    ], 422);
-                }
 
                 $totalPrice += $product->price * $item['quantity'];
                 $orderItems[] = [

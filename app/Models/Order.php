@@ -9,6 +9,13 @@ class Order extends Model
 {
     use HasFactory;
 
+    /**
+     * Validation errors array
+     *
+     * @var array
+     */
+    protected $errors = [];
+
     const STATUS_PENDING = 'pending';
     const STATUS_PROCESSING = 'processing';
     const STATUS_COMPLETED = 'completed';
@@ -23,6 +30,17 @@ class Order extends Model
         'user_id',
         'total_price',
         'status',
+    ];
+
+    /**
+     * Validation rules
+     *
+     * @var array
+     */
+    public static $rules = [
+        'user_id' => 'required|exists:users,id',
+        'total_price' => 'required|numeric|min:0',
+        'status' => 'required|in:pending,processing,completed,cancelled',
     ];
 
     /**
@@ -65,9 +83,9 @@ class Order extends Model
     {
         $validTransitions = [
             self::STATUS_PENDING => [self::STATUS_PROCESSING, self::STATUS_CANCELLED],
-            self::STATUS_PROCESSING => [self::STATUS_COMPLETED, self::STATUS_CANCELLED],
+            self::STATUS_PROCESSING => [self::STATUS_COMPLETED],
             self::STATUS_COMPLETED => [],
-            self::STATUS_CANCELLED => [],
+            self::STATUS_CANCELLED => [], // Prevent transition from PROCESSING to CANCELLED
         ];
 
         return in_array($newStatus, $validTransitions[$this->status] ?? []);
@@ -95,4 +113,44 @@ class Order extends Model
         $this->status = $status;
         return $this->save();
     }
-} 
+
+    /**
+     * Validate the order and its items
+     */
+    public function validate(): bool
+    {
+        $errors = []; // Use local array first
+        $validator = \Validator::make($this->attributes, static::$rules);
+        
+        if ($validator->fails()) {
+            $errors = $validator->errors()->toArray();
+        }
+
+        // Validate order items if present
+        if ($this->orderItems && $this->orderItems->isNotEmpty()) {
+            foreach ($this->orderItems as $index => $item) {
+                $itemValidator = \Validator::make(
+                    $item->attributes, 
+                    OrderItem::$rules
+                );
+
+                if ($itemValidator->fails()) {
+                    foreach ($itemValidator->errors()->toArray() as $key => $error) {
+                        $errors["orderItems.$index.$key"] = $error;
+                    }
+                }
+            }
+        }
+
+        $this->errors = $errors; // Assign to property at the end
+        return empty($errors);
+    }
+
+    /**
+     * Get validation errors
+     */
+    public function errors(): array
+    {
+        return $this->errors ?? [];
+    }
+}

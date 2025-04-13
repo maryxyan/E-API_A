@@ -93,7 +93,7 @@ class OrderTest extends TestCase
 
         $order->update(['status' => Order::STATUS_PROCESSING]);
         $this->assertTrue($order->canUpdateStatus(Order::STATUS_COMPLETED));
-        $this->assertTrue($order->canUpdateStatus(Order::STATUS_CANCELLED));
+        $this->assertFalse($order->canUpdateStatus(Order::STATUS_CANCELLED));
         $this->assertFalse($order->canUpdateStatus(Order::STATUS_PENDING));
 
         $order->update(['status' => Order::STATUS_COMPLETED]);
@@ -105,12 +105,90 @@ class OrderTest extends TestCase
     /** @test */
     public function it_can_update_status()
     {
+        // Test valid transitions from PENDING
         $order = Order::factory()->create(['status' => Order::STATUS_PENDING]);
         
+        // Test valid transition to PROCESSING
         $this->assertTrue($order->updateStatus(Order::STATUS_PROCESSING));
         $this->assertEquals(Order::STATUS_PROCESSING, $order->fresh()->status);
+        
+        // Test valid transition to CANCELLED
+        $order->update(['status' => Order::STATUS_PENDING]);
+        $this->assertTrue($order->updateStatus(Order::STATUS_CANCELLED));
+        $this->assertEquals(Order::STATUS_CANCELLED, $order->fresh()->status);
 
+        // Test invalid transitions from PENDING
+        $order->update(['status' => Order::STATUS_PENDING]);
+        $this->assertFalse($order->updateStatus(Order::STATUS_COMPLETED));
+        $this->assertEquals(Order::STATUS_PENDING, $order->fresh()->status);
+
+        // Test transitions from PROCESSING
+        $order->update(['status' => Order::STATUS_PROCESSING]);
+        
+        // Test valid transition to COMPLETED
+        $this->assertTrue($order->updateStatus(Order::STATUS_COMPLETED));
+        $this->assertEquals(Order::STATUS_COMPLETED, $order->fresh()->status);
+        
+        // Test invalid transition to CANCELLED
+        $order->update(['status' => Order::STATUS_PROCESSING]);
+        $this->assertFalse($order->updateStatus(Order::STATUS_CANCELLED));
+        $this->assertEquals(Order::STATUS_PROCESSING, $order->fresh()->status);
+
+        // Test invalid transitions from PROCESSING
+        $order->update(['status' => Order::STATUS_PROCESSING]);
         $this->assertFalse($order->updateStatus(Order::STATUS_PENDING));
         $this->assertEquals(Order::STATUS_PROCESSING, $order->fresh()->status);
+
+        // Test transitions from COMPLETED
+        $order->update(['status' => Order::STATUS_COMPLETED]);
+        
+        // Test that no transitions are allowed from COMPLETED
+        $this->assertFalse($order->updateStatus(Order::STATUS_PENDING));
+        $this->assertFalse($order->updateStatus(Order::STATUS_PROCESSING));
+        $this->assertFalse($order->updateStatus(Order::STATUS_CANCELLED));
+        $this->assertEquals(Order::STATUS_COMPLETED, $order->fresh()->status);
+
+        // Test transitions from CANCELLED
+        $order->update(['status' => Order::STATUS_CANCELLED]);
+        
+        // Test that no transitions are allowed from CANCELLED
+        $this->assertFalse($order->updateStatus(Order::STATUS_PENDING));
+        $this->assertFalse($order->updateStatus(Order::STATUS_PROCESSING));
+        $this->assertFalse($order->updateStatus(Order::STATUS_COMPLETED));
+        $this->assertEquals(Order::STATUS_CANCELLED, $order->fresh()->status);
     }
-} 
+
+    /** @test */
+    public function order_creation_validates_required_fields()
+    {
+        $order = new Order();
+        $this->assertFalse($order->validate());
+
+        $requiredFields = ['user_id', 'total_price', 'status'];
+        foreach ($requiredFields as $field) {
+            $this->assertArrayHasKey($field, $order->errors());
+        }
+    }
+
+    /** @test */
+    public function order_creation_validates_product_existence()
+    {
+        $order = Order::factory()->make();
+        $invalidProduct = OrderItem::factory()->make(['product_id' => 999]);
+        $order->orderItems = collect([$invalidProduct]);
+
+        $this->assertFalse($order->validate());
+        $this->assertArrayHasKey('orderItems.0.product_id', $order->errors());
+    }
+
+    /** @test */
+    public function order_creation_validates_quantity()
+    {
+        $order = Order::factory()->make();
+        $invalidItem = OrderItem::factory()->make(['quantity' => 0]);
+        $order->orderItems = collect([$invalidItem]);
+
+        $this->assertFalse($order->validate());
+        $this->assertArrayHasKey('orderItems.0.quantity', $order->errors());
+    }
+}

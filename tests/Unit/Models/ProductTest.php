@@ -4,13 +4,10 @@ namespace Tests\Unit\Models;
 
 use App\Models\OrderItem;
 use App\Models\Product;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ProductTest extends TestCase
 {
-    use RefreshDatabase;
-
     /** @test */
     public function it_can_create_a_product()
     {

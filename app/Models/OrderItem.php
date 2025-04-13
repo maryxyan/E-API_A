@@ -15,10 +15,22 @@ class OrderItem extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'order_id',
+        'order_id', 
         'product_id',
         'quantity',
         'price',
+    ];
+
+    /**
+     * Validation rules
+     *
+     * @var array
+     */
+    public static $rules = [
+        'order_id' => 'required|exists:orders,id',
+        'product_id' => 'required|exists:products,id',
+        'quantity' => 'required|integer|min:1',
+        'price' => 'required|numeric|min:0',
     ];
 
     /**
