@@ -25,11 +25,7 @@ class Product extends Model
         ];
     }
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
+
     protected $fillable = [
         'name',
         'description',
@@ -37,11 +33,7 @@ class Product extends Model
         'stock_quantity',
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
+ 
     protected $casts = [
         'price' => 'float',
         'stock_quantity' => 'integer',
