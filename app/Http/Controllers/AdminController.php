@@ -11,7 +11,44 @@ use Illuminate\Database\Eloquent\Builder;
 class AdminController extends Controller
 {
     /**
-     * Get all products with optional search and filters.
+     * @OA\Get(
+     *     path="/api/admin/products",
+     *     summary="Get all products with optional filters",
+     *     tags={"Admin Products"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="min_price",
+     *         in="query",
+     *         description="Minimum price",
+     *         required=false,
+     *         @OA\Schema(type="number")
+     *     ),
+     *     @OA\Parameter(
+     *         name="max_price",
+     *         in="query",
+     *         description="Maximum price",
+     *         required=false,
+     *         @OA\Schema(type="number")
+     *     ),
+     *     @OA\Parameter(
+     *         name="in_stock",
+     *         in="query",
+     *         description="Filter by stock availability",
+     *         required=false,
+     *         @OA\Schema(type="boolean")
+     *     ),
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Search term",
+     *         required=false,
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="List of products"
+     *     )
+     * )
      */
     public function getProducts(Request $request)
     {
@@ -69,7 +106,30 @@ class AdminController extends Controller
     }
 
     /**
-     * Create a new product.
+     * @OA\Post(
+     *     path="/api/admin/products",
+     *     summary="Create a new product",
+     *     tags={"Admin Products"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"name", "description", "price", "stock_quantity"},
+     *             @OA\Property(property="name", type="string"),
+     *             @OA\Property(property="description", type="string"),
+     *             @OA\Property(property="price", type="number", format="float"),
+     *             @OA\Property(property="stock_quantity", type="integer")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Product created successfully"
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error"
+     *     )
+     * )
      */
     public function createProduct(Request $request)
     {
@@ -92,7 +152,35 @@ class AdminController extends Controller
     }
 
     /**
-     * Update a product.
+     * @OA\Put(
+     *     path="/api/admin/products/{product}",
+     *     summary="Update a product",
+     *     tags={"Admin Products"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="product",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             @OA\Property(property="name", type="string"),
+     *             @OA\Property(property="description", type="string"),
+     *             @OA\Property(property="price", type="number", format="float"),
+     *             @OA\Property(property="stock_quantity", type="integer")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Product updated successfully"
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error"
+     *     )
+     * )
      */
     public function updateProduct(Request $request, Product $product)
     {
@@ -112,7 +200,26 @@ class AdminController extends Controller
     }
 
     /**
-     * Delete a product.
+     * @OA\Delete(
+     *     path="/api/admin/products/{product}",
+     *     summary="Delete a product",
+     *     tags={"Admin Products"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="product",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=204,
+     *         description="Product deleted successfully"
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Cannot delete product with associated orders"
+     *     )
+     * )
      */
     public function deleteProduct(Product $product)
     {
@@ -128,7 +235,40 @@ class AdminController extends Controller
     }
 
     /**
-     * Get all orders with optional filters.
+     * @OA\Get(
+     *     path="/api/admin/orders",
+     *     summary="Get all orders with optional filters",
+     *     tags={"Admin Orders"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="status",
+     *         in="query",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"pending", "processing", "completed", "cancelled"})
+     *     ),
+     *     @OA\Parameter(
+     *         name="user_id",
+     *         in="query",
+     *         required=false,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Parameter(
+     *         name="date_from",
+     *         in="query",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date")
+     *     ),
+     *     @OA\Parameter(
+     *         name="date_to",
+     *         in="query",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="List of orders"
+     *     )
+     * )
      */
     public function getOrders(Request $request)
     {
@@ -168,7 +308,33 @@ class AdminController extends Controller
     }
 
     /**
-     * Update order status.
+     * @OA\Put(
+     *     path="/api/admin/orders/{order}/status",
+     *     summary="Update order status",
+     *     tags={"Admin Orders"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="order",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"status"},
+     *             @OA\Property(property="status", type="string")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Status updated successfully"
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Invalid status transition"
+     *     )
+     * )
      */
     public function updateOrderStatus(Request $request, Order $order)
     {
@@ -196,7 +362,16 @@ class AdminController extends Controller
     }
 
     /**
-     * Get order statistics.
+     * @OA\Get(
+     *     path="/api/admin/orders/statistics",
+     *     summary="Get order statistics",
+     *     tags={"Admin Orders"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Order statistics"
+     *     )
+     * )
      */
     public function getOrderStatistics()
     {
@@ -212,4 +387,4 @@ class AdminController extends Controller
             'processing_orders' => $processingOrders,
         ]);
     }
-} 
+}

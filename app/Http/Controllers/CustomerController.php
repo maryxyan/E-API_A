@@ -16,30 +16,49 @@ class CustomerController extends Controller
      */
     public function getProducts(Request $request)
     {
+        $user = auth()->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
         $validator = Validator::make($request->all(), [
             'min_price' => 'nullable|numeric|min:0',
             'max_price' => 'nullable|numeric|min:0',
             'search' => 'nullable|string|max:255',
+            'in_stock' => 'nullable|in:true,false,1,0',
         ]);
 
         if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
+            return response()->json(['message' => 'Validation failed', 'errors' => $validator->errors()], 422);
         }
 
-        $query = Product::inStock();
+        try {
+            $query = Product::query();
 
-        // Apply price range filter
-        if ($request->has('min_price') && $request->has('max_price')) {
-            $query->priceRange($request->min_price, $request->max_price);
+            // Apply in_stock filter
+            if ($request->has('in_stock')) {
+                $query->where('stock_quantity', '>', 0);
+            }
+
+            // Apply price range filter
+            if ($request->has('min_price') && $request->has('max_price')) {
+                $query->priceRange($request->min_price, $request->max_price);
+            }
+
+            // Apply search
+            if ($request->has('search')) {
+                $query->search($request->search);
+            }
+
+            $products = $query->get();
+            return response()->json($products);
+        } catch (\Exception $e) {
+            \Log::error('Error fetching products: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'An error occurred while fetching products',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        // Apply search
-        if ($request->has('search')) {
-            $query->search($request->search);
-        }
-
-        $products = $query->get();
-        return response()->json($products);
     }
 
     /**
@@ -47,13 +66,26 @@ class CustomerController extends Controller
      */
     public function getProduct(Product $product)
     {
-        if (!$product->isInStock()) {
-            return response()->json([
-                'message' => 'Product is out of stock'
-            ], 404);
+        $user = auth()->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-        return response()->json($product);
+        try {
+            if (!$product->isInStock()) {
+                return response()->json([
+                    'message' => 'Product is out of stock'
+                ], 404);
+            }
+
+            return response()->json($product);
+        } catch (\Exception $e) {
+            \Log::error('Error fetching product: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'An error occurred while fetching the product',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -61,33 +93,47 @@ class CustomerController extends Controller
      */
     public function getOrders(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'status' => 'nullable|in:pending,processing,completed,cancelled',
-            'date_from' => 'nullable|date',
-            'date_to' => 'nullable|date|after_or_equal:date_from',
-        ]);
+        try {
+            $validator = Validator::make($request->all(), [
+                'status' => 'nullable|in:pending,processing,completed,cancelled',
+                'date_from' => 'nullable|date',
+                'date_to' => 'nullable|date|after_or_equal:date_from',
+            ]);
 
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
+            if ($validator->fails()) {
+                return response()->json($validator->errors(), 422);
+            }
+
+            $user = auth()->user();
+            if (!$user) {
+                return response()->json(['message' => 'Unauthenticated'], 401);
+            }
+
+            $query = $user->orders()->with('orderItems.product');
+
+            // Apply status filter
+            if ($request->has('status')) {
+                $query->where('status', $request->status);
+            }
+
+            // Apply date range filter
+            if ($request->has('date_from')) {
+                $query->whereDate('created_at', '>=', $request->date_from);
+            }
+            if ($request->has('date_to')) {
+                $query->whereDate('created_at', '<=', $request->date_to);
+            }
+
+            $orders = $query->latest()->get();
+            return response()->json($orders);
+        } catch (\Exception $e) {
+            \Log::error('Error fetching orders: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+            return response()->json([
+                'message' => 'An error occurred while fetching orders',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ], 500);
         }
-
-        $query = auth()->user()->orders()->with('orderItems.product');
-
-        // Apply status filter
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
-        }
-
-        // Apply date range filter
-        if ($request->has('date_from')) {
-            $query->whereDate('created_at', '>=', $request->date_from);
-        }
-        if ($request->has('date_to')) {
-            $query->whereDate('created_at', '<=', $request->date_to);
-        }
-
-        $orders = $query->latest()->get();
-        return response()->json($orders);
     }
 
     /**
@@ -107,86 +153,44 @@ class CustomerController extends Controller
      */
     public function createOrder(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'items' => 'required|array|min:1',
-            'items.*.product_id' => [
-                'required',
-                'exists:products,id',
-                function ($attribute, $value, $fail) {
-                    $product = Product::find($value);
-                    if (!$product || !$product->isInStock()) {
-                        $fail('The selected product is invalid or out of stock.');
-                    }
-                }
-            ],
-            'items.*.quantity' => [
-                'required',
-                'integer',
-                'min:1',
-                function ($attribute, $value, $fail) use ($request) {
-                    $index = explode('.', $attribute)[1];
-                    $product = Product::find($request->items[$index]['product_id']);
-                    if ($product && $value > $product->stock_quantity) {
-                    $fail("Insufficient stock for product: Product 1");
-                    }
-                }
-            ],
-        ], [
-            'items.*.product_id.exists' => 'The selected product does not exist.',
-            'items.*.quantity.min' => 'The quantity must be at least 1.'
-        ]);
-
-        if ($validator->fails()) {
-            $errors = $validator->errors();
-            // For insufficient stock errors, return both the specific message at root level and the full errors
-            if ($errors->has('items.*.quantity')) {
-                return response()->json([
-                    'message' => $errors->first('items.*.quantity'),
-                    'errors' => $errors
-                ], 422);
-            }
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $errors
-            ], 422);
-        }
-
-        // Start transaction
-        return DB::transaction(function () use ($request) {
-            $totalPrice = 0;
-            $orderItems = [];
-            $products = [];
-
-            // Validate stock and calculate total price
-            foreach ($request->items as $item) {
-                $product = Product::findOrFail($item['product_id']);
-                
-
-                $totalPrice += $product->price * $item['quantity'];
-                $orderItems[] = [
-                    'product_id' => $product->id,
-                    'quantity' => $item['quantity'],
-                    'price' => $product->price,
-                ];
-                $products[$product->id] = $product;
+        try {
+            // Check if user is authenticated
+            $user = auth()->user();
+            if (!$user) {
+                return response()->json(['message' => 'Unauthenticated'], 401);
             }
 
-            // Create order
-            $order = Order::create([
-                'user_id' => auth()->id(),
-                'total_price' => $totalPrice,
-                'status' => Order::STATUS_PENDING,
+            // Validate request data
+            $validator = Validator::make($request->all(), [
+                'items' => 'required|array|min:1',
+                'items.*.product_id' => 'required|exists:products,id',
+                'items.*.quantity' => 'required|integer|min:1',
             ]);
 
-            // Create order items and update stock
-            foreach ($orderItems as $item) {
-                $product = $products[$item['product_id']];
-                $order->orderItems()->create($item);
-                $product->decreaseStock($item['quantity']);
+            if ($validator->fails()) {
+                return response()->json([
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
             }
 
-            return response()->json($order->load('orderItems.product'), 201);
-        });
+            // Start transaction
+            return DB::transaction(function () use ($request, $user) {
+                $order = Order::createWithItems($request->items, $user->id);
+                return response()->json($order->load('orderItems'), 201);
+            });
+
+        } catch (\Exception $e) {
+            if (str_contains($e->getMessage(), 'Insufficient stock')) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
+
+            \Log::error('Error creating order: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'An error occurred while creating the order',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -215,4 +219,4 @@ class CustomerController extends Controller
             return response()->json($order->load('orderItems.product'));
         });
     }
-} 
+}

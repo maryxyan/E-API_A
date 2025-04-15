@@ -99,8 +99,8 @@ class Product extends Model
             return false;
         }
 
-        $this->decrement('stock_quantity', $quantity);
-        return true;
+        $this->stock_quantity -= $quantity;
+        return $this->save();
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class Order extends Model
 {
@@ -148,5 +149,60 @@ class Order extends Model
     public function errors(): array
     {
         return $this->errors ?? [];
+    }
+
+    /**
+     * Create a new order with items.
+     */
+    public static function createWithItems(array $items, int $userId): self
+    {
+        return DB::transaction(function () use ($items, $userId) {
+            $totalPrice = 0;
+            $orderItems = [];
+
+            // Validate stock and calculate total price
+            foreach ($items as $item) {
+                $product = Product::find($item['product_id']);
+                if (!$product) {
+                    throw new \Exception("Product with ID {$item['product_id']} not found");
+                }
+
+                if (!$product->isInStock()) {
+                    throw new \Exception("Product {$product->name} is out of stock");
+                }
+
+                if (!$product->hasSufficientStock($item['quantity'])) {
+                    throw new \Exception("Insufficient stock for product: {$product->name}");
+                }
+
+                $totalPrice += $product->price * $item['quantity'];
+                $orderItems[] = [
+                    'product_id' => $product->id,
+                    'quantity' => $item['quantity'],
+                    'price' => $product->price,
+                ];
+            }
+
+            // Create order
+            $order = self::create([
+                'user_id' => $userId,
+                'total_price' => $totalPrice,
+                'status' => self::STATUS_PENDING,
+            ]);
+
+            // Create order items and update stock
+            foreach ($orderItems as $item) {
+                $order->orderItems()->create($item);
+                $product = Product::find($item['product_id']);
+                if (!$product) {
+                    throw new \Exception("Product with ID {$item['product_id']} not found");
+                }
+                if (!$product->decreaseStock($item['quantity'])) {
+                    throw new \Exception("Failed to decrease stock for product {$product->name}");
+                }
+            }
+
+            return $order->load('orderItems');
+        });
     }
 }

@@ -11,3 +11,7 @@ Route::get('/', function () {
 Route::get('/api/swagger.json', [SwaggerJsonController::class, 'index'])
     ->name('swagger.json')
     ->middleware('api');
+
+Route::get('/swagger-ui', function () {
+    return redirect('/docs/index.html');
+});

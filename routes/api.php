@@ -17,6 +17,7 @@ use App\Http\Controllers\SwaggerJsonController;
 Route::get('/swagger.json', [SwaggerJsonController::class, 'index'])->name('swagger.json');
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::get('/products', [\App\Http\Controllers\ProductController::class, 'index']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -35,7 +36,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // Customer routes
-    Route::prefix('customer')->group(function () {
+    Route::middleware('auth:sanctum')->prefix('customer')->group(function () {
         Route::get('/products', [CustomerController::class, 'getProducts']);
         Route::get('/products/{product}', [CustomerController::class, 'getProduct']);
         Route::get('/orders', [CustomerController::class, 'getOrders']);

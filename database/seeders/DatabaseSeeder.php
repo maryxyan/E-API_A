@@ -71,55 +71,7 @@ class DatabaseSeeder extends Seeder
             Product::factory()->create($product);
         }
 
-        // Create sample orders
-        $customer = User::where('email', 'customer@example.com')->first();
-        $laptop = Product::where('name', 'Laptop')->first();
-        $phone = Product::where('name', 'Smartphone')->first();
-
-        // Create a pending order
-        $order = Order::factory()->create([
-            'user_id' => $customer->id,
-            'status' => Order::STATUS_PENDING,
-            'total_price' => $laptop->price + $phone->price,
-        ]);
-
-        $order->orderItems()->createMany([
-            [
-                'product_id' => $laptop->id,
-                'quantity' => 1,
-                'price' => $laptop->price,
-            ],
-            [
-                'product_id' => $phone->id,
-                'quantity' => 1,
-                'price' => $phone->price,
-            ],
-        ]);
-
-        // Create a processing order
-        $order = Order::factory()->create([
-            'user_id' => $customer->id,
-            'status' => Order::STATUS_PROCESSING,
-            'total_price' => $laptop->price * 2,
-        ]);
-
-        $order->orderItems()->create([
-            'product_id' => $laptop->id,
-            'quantity' => 2,
-            'price' => $laptop->price,
-        ]);
-
-        // Create a completed order
-        $order = Order::factory()->create([
-            'user_id' => $customer->id,
-            'status' => Order::STATUS_COMPLETED,
-            'total_price' => $phone->price * 3,
-        ]);
-
-        $order->orderItems()->create([
-            'product_id' => $phone->id,
-            'quantity' => 3,
-            'price' => $phone->price,
-        ]);
+        // Run the OrderSeeder
+        $this->call(OrderSeeder::class);
     }
 }

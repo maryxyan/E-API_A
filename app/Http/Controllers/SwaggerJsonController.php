@@ -28,48 +28,6 @@ use OpenApi\Generator;
 
 /**
  * @OA\PathItem(
- *     path="/api/products",
- *     @OA\Get(
- *         summary="Get all products",
- *         tags={"Products"},
- *         @OA\Parameter(
- *             name="search",
- *             in="query",
- *             description="Search term",
- *             required=false,
- *             @OA\Schema(type="string")
- *         ),
- *         @OA\Parameter(
- *             name="min_price",
- *             in="query",
- *             description="Minimum price",
- *             required=false,
- *             @OA\Schema(type="number")
- *         ),
- *         @OA\Parameter(
- *             name="max_price",
- *             in="query",
- *             description="Maximum price",
- *             required=false,
- *             @OA\Schema(type="number")
- *         ),
- *         @OA\Parameter(
- *             name="in_stock",
- *             in="query",
- *             description="Filter by stock availability",
- *             required=false,
- *             @OA\Schema(type="boolean")
- *         ),
- *         @OA\Response(
- *             response=200,
- *             description="Successful operation"
- *         )
- *     )
- * )
- */
-
-/**
- * @OA\PathItem(
  *     path="/api/customer/orders",
  *     @OA\Post(
  *         summary="Create a new order",
@@ -248,4 +206,4 @@ class SwaggerJsonController extends Controller
             ], 500);
         }
     }
-} 
+}
