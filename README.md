@@ -51,7 +51,7 @@ A RESTful API for an e-commerce platform built with Laravel, providing product m
 
 ## API Documentation
 
-Access the API documentation at `/api/swagger.json` after starting the server. Import this file into Swagger UI or Postman for interactive documentation.
+Access the API documentation at `/api/swagger.json`  or `/docs/index.html` for the UI after starting the server. Import this file into Swagger UI or Postman for interactive documentation.
 
 ### Key Endpoints
 
