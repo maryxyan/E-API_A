@@ -387,4 +387,41 @@ class AdminController extends Controller
             'processing_orders' => $processingOrders,
         ]);
     }
+
+    /**
+     * @OA\Get(
+     *     path="/api/admin/products/{product}",
+     *     summary="Get a specific product",
+     *     tags={"Admin Products"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="product",
+     *         in="path",
+     *         description="Product ID",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Product details",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="id", type="integer"),
+     *             @OA\Property(property="name", type="string"),
+     *             @OA\Property(property="description", type="string"),
+     *             @OA\Property(property="price", type="number", format="float"),
+     *             @OA\Property(property="stock_quantity", type="integer"),
+     *             @OA\Property(property="created_at", type="string", format="date-time"),
+     *             @OA\Property(property="updated_at", type="string", format="date-time")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Product not found"
+     *     )
+     * )
+     */
+    public function getProduct(Product $product)
+    {
+        return response()->json($product);
+    }
 }
