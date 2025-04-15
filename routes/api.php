@@ -20,7 +20,7 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::get('/products', [\App\Http\Controllers\ProductController::class, 'index']);
 
 // Protected routes
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'api'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 
     // Admin routes
@@ -36,7 +36,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // Customer routes
-    Route::middleware('auth:sanctum')->prefix('customer')->group(function () {
+    Route::prefix('customer')->group(function () {
         Route::get('/products', [CustomerController::class, 'getProducts']);
         Route::get('/products/{product}', [CustomerController::class, 'getProduct']);
         Route::get('/orders', [CustomerController::class, 'getOrders']);

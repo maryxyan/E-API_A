@@ -8,6 +8,7 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class CustomerController extends Controller
 {
@@ -16,8 +17,7 @@ class CustomerController extends Controller
      */
     public function getProducts(Request $request)
     {
-        $user = auth()->user();
-        if (!$user) {
+        if (!Auth::check()) {
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
@@ -66,8 +66,7 @@ class CustomerController extends Controller
      */
     public function getProduct(Product $product)
     {
-        $user = auth()->user();
-        if (!$user) {
+        if (!Auth::check()) {
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
@@ -94,6 +93,10 @@ class CustomerController extends Controller
     public function getOrders(Request $request)
     {
         try {
+            if (!Auth::check()) {
+                return response()->json(['message' => 'Unauthenticated'], 401);
+            }
+
             $validator = Validator::make($request->all(), [
                 'status' => 'nullable|in:pending,processing,completed,cancelled',
                 'date_from' => 'nullable|date',
@@ -104,12 +107,7 @@ class CustomerController extends Controller
                 return response()->json($validator->errors(), 422);
             }
 
-            $user = auth()->user();
-            if (!$user) {
-                return response()->json(['message' => 'Unauthenticated'], 401);
-            }
-
-            $query = $user->orders()->with('orderItems.product');
+            $query = Auth::user()->orders()->with('orderItems.product');
 
             // Apply status filter
             if ($request->has('status')) {
@@ -141,7 +139,11 @@ class CustomerController extends Controller
      */
     public function getOrder(Order $order)
     {
-        if ($order->user_id !== auth()->id()) {
+        if (!Auth::check()) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        if ($order->user_id !== Auth::id()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -154,9 +156,7 @@ class CustomerController extends Controller
     public function createOrder(Request $request)
     {
         try {
-            // Check if user is authenticated
-            $user = auth()->user();
-            if (!$user) {
+            if (!Auth::check()) {
                 return response()->json(['message' => 'Unauthenticated'], 401);
             }
 
@@ -175,8 +175,8 @@ class CustomerController extends Controller
             }
 
             // Start transaction
-            return DB::transaction(function () use ($request, $user) {
-                $order = Order::createWithItems($request->items, $user->id);
+            return DB::transaction(function () use ($request) {
+                $order = Order::createWithItems($request->items, Auth::id());
                 return response()->json($order->load('orderItems'), 201);
             });
 
@@ -198,7 +198,11 @@ class CustomerController extends Controller
      */
     public function cancelOrder(Order $order)
     {
-        if ($order->user_id !== auth()->id()) {
+        if (!Auth::check()) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        if ($order->user_id !== Auth::id()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
